@@ -1,5 +1,4 @@
 import os
-from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from ads_mcp.server import mcp
@@ -9,14 +8,12 @@ BASE_URL = os.getenv(
     "https://rc-google-mcp-google-mcp.adefxc.easypanel.host"
 )
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    async with mcp.session_manager.run():
-        yield
+# Cria o ASGI app do MCP
+mcp_app = mcp.http_app(path="/mcp")
 
-app = FastAPI(lifespan=lifespan)
+# FastAPI herdando o lifespan do MCP
+app = FastAPI(lifespan=mcp_app.lifespan)
 
-# Endpoint exigido pelo ChatGPT e claude.ai
 @app.get("/.well-known/oauth-protected-resource")
 async def oauth_protected_resource():
     return JSONResponse({
@@ -29,5 +26,5 @@ async def oauth_protected_resource():
         "bearer_methods_supported": ["header"]
     })
 
-# Monta o MCP na rota /mcp
-app.mount("/mcp", mcp.get_asgi_app())
+# Monta o MCP
+app.mount("/", mcp_app)
